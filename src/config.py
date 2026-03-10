@@ -70,11 +70,7 @@ def _apply_env_overrides(config: dict):
         raw_value = _get_env_override(env_key)
         if raw_value is None:
             continue
-        parsed_value = parser(raw_value)
-        print(f"DEBUG: Applying env override: {env_key}={raw_value} -> {path}={parsed_value}")
-        _set_nested_value(config, path, parsed_value)
-
-    print(f"DEBUG: After overrides, llm.provider = {config.get('llm', {}).get('provider')}")
+        _set_nested_value(config, path, parser(raw_value))
 
 
 def load_config(path: str = None) -> dict:
