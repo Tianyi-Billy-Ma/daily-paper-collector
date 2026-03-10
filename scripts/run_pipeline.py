@@ -17,6 +17,8 @@ def main():
     logger = logging.getLogger(__name__)
 
     config = load_config()
+    logger.info("LLM provider from config: %s", config.get("llm", {}).get("provider"))
+    logger.info("LLM_PROVIDER env var: %s", os.environ.get("LLM_PROVIDER"))
     pipeline = DailyPipeline(config)
     result = asyncio.run(pipeline.run())
     logger.info("Pipeline completed: %s", result)
