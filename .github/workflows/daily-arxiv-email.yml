@@ -58,18 +58,17 @@ jobs:
             ${{ runner.os }}-huggingface-
 
       - name: Install dependencies
-        run: |
-          uv pip install --python 3.11 -e .
+        run: uv pip install --system -e .
 
       - name: Ensure database directory exists
         run: mkdir -p "$(dirname "$DATABASE_PATH")"
 
       - name: Run daily pipeline
-        run: uv run --python 3.11 python scripts/run_pipeline.py
+        run: python scripts/run_pipeline.py
 
       - name: Flush SQLite WAL to tracked database file
         if: always()
-        run: uv run --python 3.11 python scripts/checkpoint_db.py
+        run: python scripts/checkpoint_db.py
 
       - name: Commit updated database
         run: |
