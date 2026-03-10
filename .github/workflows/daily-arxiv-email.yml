@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv --python 3.11
-          uv sync --extra dev
+          uv sync --all-extras
 
       - name: Ensure database directory exists
         run: mkdir -p "$(dirname "$DATABASE_PATH")"
