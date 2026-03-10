@@ -1,0 +1,85 @@
+name: Daily arXiv Email
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-arxiv-email
+  cancel-in-progress: false
+
+jobs:
+  run-daily-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      ARXIV_CATEGORIES: ${{ vars.ARXIV_CATEGORIES }}
+      ARXIV_MAX_RESULTS_PER_CATEGORY: ${{ vars.ARXIV_MAX_RESULTS_PER_CATEGORY }}
+      ARXIV_CUTOFF_DAYS: ${{ vars.ARXIV_CUTOFF_DAYS }}
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openai' }}
+      EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      EMAIL_TO: ${{ vars.EMAIL_TO }}
+      EMAIL_SUBJECT_PREFIX: ${{ vars.EMAIL_SUBJECT_PREFIX }}
+      REPORT_CHINESE: ${{ vars.REPORT_CHINESE }}
+      DATABASE_PATH: ${{ vars.DATABASE_PATH || 'data/papers.db' }}
+      HF_HOME: ~/.cache/huggingface
+      TRANSFORMERS_CACHE: ~/.cache/huggingface
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.13"
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Cache sentence-transformers models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: ${{ runner.os }}-huggingface-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-huggingface-
+
+      - name: Install dependencies
+        run: |
+          uv venv --python 3.11
+          uv sync --extra dev
+
+      - name: Ensure database directory exists
+        run: mkdir -p "$(dirname "$DATABASE_PATH")"
+
+      - name: Run daily pipeline
+        run: uv run python scripts/run_pipeline.py
+
+      - name: Flush SQLite WAL to tracked database file
+        if: always()
+        run: uv run python scripts/checkpoint_db.py
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f "$DATABASE_PATH" ]; then
+            git add "$DATABASE_PATH"
+          fi
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: update daily paper state [skip ci]"
+          git push
