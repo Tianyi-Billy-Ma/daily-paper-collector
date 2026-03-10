@@ -61,7 +61,8 @@ jobs:
         run: |
           uv venv --python 3.11
           source .venv/bin/activate
-          pip install -e .
+          python -m pip install --upgrade pip
+          python -m pip install -e .
 
       - name: Ensure database directory exists
         run: mkdir -p "$(dirname "$DATABASE_PATH")"
