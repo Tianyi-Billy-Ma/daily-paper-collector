@@ -14,7 +14,15 @@ class OpenAIProvider(LLMProvider):
         api_key = os.environ.get(api_key_env)
         if not api_key:
             raise ValueError(f"Environment variable '{api_key_env}' is not set")
-        self.client = openai.AsyncOpenAI(api_key=api_key)
+
+        # Support custom base_url from config or environment
+        base_url = config.get("base_url") or os.environ.get("OPENAI_BASE_URL")
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+            self.logger.info(f"Using custom OpenAI base_url: {base_url}")
+
+        self.client = openai.AsyncOpenAI(**client_kwargs)
         self.model = config.get("model", "gpt-4o-mini")
 
     async def complete(self, prompt: str, system: str = "") -> str:
