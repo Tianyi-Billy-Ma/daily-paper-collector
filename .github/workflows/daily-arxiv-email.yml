@@ -66,11 +66,15 @@ jobs:
         run: mkdir -p "$(dirname "$DATABASE_PATH")"
 
       - name: Run daily pipeline
-        run: uv run python scripts/run_pipeline.py
+        run: |
+          source .venv/bin/activate
+          python scripts/run_pipeline.py
 
       - name: Flush SQLite WAL to tracked database file
         if: always()
-        run: uv run python scripts/checkpoint_db.py
+        run: |
+          source .venv/bin/activate
+          python scripts/checkpoint_db.py
 
       - name: Commit updated database
         run: |
