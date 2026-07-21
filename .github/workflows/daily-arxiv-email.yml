@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
+      GH_TOKEN: ${{ github.token }}
+      STATE_RELEASE_TAG: daily-paper-state
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
@@ -39,8 +41,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,6 +70,14 @@ jobs:
       - name: Ensure database directory exists
         run: mkdir -p "$(dirname "$DATABASE_PATH")"
 
+      - name: Restore latest database state
+        run: |
+          if gh release view "$STATE_RELEASE_TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -Fxq papers.db; then
+            gh release download "$STATE_RELEASE_TAG" --pattern papers.db --output "$DATABASE_PATH" --clobber
+          else
+            echo "No persisted database asset found; using the repository bootstrap database."
+          fi
+
       - name: Run daily pipeline
         run: python scripts/run_pipeline.py
 
@@ -77,16 +85,13 @@ jobs:
         if: always()
         run: python scripts/checkpoint_db.py
 
-      - name: Commit updated database
+      - name: Persist database state
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -f "$DATABASE_PATH" ]; then
-            git add -f "$DATABASE_PATH"
+          if ! gh release view "$STATE_RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$STATE_RELEASE_TAG" \
+              --draft \
+              --target "$GITHUB_SHA" \
+              --title "Daily paper collector state" \
+              --notes "Mutable database state managed by the Daily arXiv Email workflow."
           fi
-          if git diff --cached --quiet; then
-            echo "No database changes to commit."
-            exit 0
-          fi
-          git commit -m "chore: update daily paper state [skip ci]"
-          git push
+          gh release upload "$STATE_RELEASE_TAG" "$DATABASE_PATH#Latest compacted database" --clobber

@@ -66,8 +66,7 @@ class DailyPipeline:
 
         # Step 3: Embed new papers that don't have embeddings yet
         self.logger.info("Computing embeddings for papers without embeddings...")
-        papers_to_embed = self.store.get_papers_without_embeddings()
-        self.embedder.compute_embeddings(papers_to_embed, self.store)
+        self.embedder.compute_embeddings(new_papers, self.store)
 
         # Step 4: Interests
         interests = self.interest_mgr.get_interests_with_embeddings()
